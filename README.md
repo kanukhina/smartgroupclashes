@@ -1,6 +1,10 @@
 # SmartGroupClashes
 
 Плагин для **Autodesk Navisworks Manage**, который ускоряет разбор коллизий: группирует результаты Clash Detective по выбранным правилам и позволяет работать сразу с несколькими тестами.
+<img width="707" height="640" alt="image" src="https://github.com/user-attachments/assets/458d1656-b58e-47b9-9010-0146c7b4878f" />
+
+<img width="1191" height="231" alt="image" src="https://github.com/user-attachments/assets/604293a9-8911-498b-af7e-e963cc209beb" />
+Пример сгруппированных пересечений по оси и имени типа
 
 Проект основан на [GroupClashes](https://github.com/simonmoreau/GroupClashes) и развивается как отдельная ветка с собственным именованием, сборкой и установкой.
 
