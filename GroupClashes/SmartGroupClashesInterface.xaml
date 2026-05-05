@@ -1,0 +1,226 @@
+﻿<UserControl x:Class="SmartGroupClashes.SmartGroupClashesInterface"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:sgc="clr-namespace:SmartGroupClashes"
+             mc:Ignorable="d" MinHeight="520" MinWidth="420"
+             FontFamily="Arial">
+    <UserControl.Resources>
+        <Style TargetType="{x:Type Button}">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="MinWidth" Value="130"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style TargetType="{x:Type ComboBox}">
+            <Setter Property="Height" Value="28"/>
+        </Style>
+        <Style TargetType="{x:Type ProgressBar}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+        <Style TargetType="{x:Type GroupBox}">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="2.5" />
+        </Style>
+        <Style TargetType="{x:Type TextBox}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style TargetType="{x:Type CheckBox}">
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style TargetType="{x:Type RadioButton}">
+            <Setter Property="Height" Value="18"/>
+        </Style>
+    </UserControl.Resources>
+    <Grid Margin="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <GroupBox Grid.Row="0" x:Name="clashTestGroupBox" Header="Тесты коллизий">
+            <Grid Margin="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="90" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="SearchTextBox"
+                             Grid.Column="0"
+                             Margin="0"
+                             VerticalAlignment="Center"
+                             ToolTip="Введите текст для фильтрации тестов"
+                             TextChanged="SearchTextBox_TextChanged"/>
+                    <TextBlock Text="Найти проверку"
+                               Grid.Column="0"
+                               Foreground="Gray"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding ElementName=SearchTextBox, Path=Text}" Value=""/>
+                                            <Condition Binding="{Binding ElementName=SearchTextBox, Path=IsKeyboardFocusWithin}" Value="False"/>
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="8,0,0,0">
+                        <Button Content="Выбрать всё"
+                                MinWidth="100"
+                                Height="24"
+                                Padding="8,0"
+                                Margin="0,0,6,0"
+                                Click="SelectAllTestsButton_Click"/>
+                        <Button Content="Снять выбор"
+                                MinWidth="100"
+                                Height="24"
+                                Padding="8,0"
+                                Margin="0"
+                                Click="ClearSelectionButton_Click"/>
+                    </StackPanel>
+                </Grid>
+                <ListBox Grid.Row="1" x:Name="ClashTestListBox"
+                         ItemsSource="{Binding Path=ClashTests}"
+                         SelectionMode="Multiple"
+                         PreviewMouseLeftButtonDown="ClashTestListBox_PreviewMouseLeftButtonDown"
+                         SelectionChanged="ClashTestListBox_SelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="sgc:CustomClashTest">
+                            <Label Content="{Binding DisplayName}"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Orientation="Vertical" Grid.Row="2" Margin="0,10,0,0">
+                    <Label Grid.Column="0" Grid.Row="1" Name="SelectedTestsCountLabel" Content="Выбрано тестов: 0" Padding="0" Height="20" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                    <Label Grid.Column="0" Grid.Row="1" Name="TestName"
+                       Content="{Binding ElementName=ClashTestListBox, Path=SelectedItem.DisplayName}"
+                       ContentStringFormat="Тест коллизий: {0}" Padding="0" />
+                    <Label Grid.Column="0" Grid.Row="1" Name="selectionALabel"
+                       Content="{Binding ElementName=ClashTestListBox, Path=SelectedItem.SelectionAName}"
+                       ContentStringFormat="Выбор A: {0}" Padding="0"/>
+                    <Label Grid.Column="0" Grid.Row="1" Name="selectionBLabel"
+                       Content="{Binding ElementName=ClashTestListBox, Path=SelectedItem.SelectionBName}"
+                       ContentStringFormat="Выбор B: {0}" Padding="0"/>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+        <GroupBox Grid.Row="1" x:Name="methodGroupBox" Header="Режим группировки">
+            <Grid Margin="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="auto" />
+                    <RowDefinition Height="auto" />
+                </Grid.RowDefinitions>
+                <Label Grid.Column="0" Grid.Row="0" Content="Группировать по: " VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" Grid.Row="0" Name="comboBoxGroupBy"
+                          IsEnabled="False"
+                          DisplayMemberPath="DisplayName"
+                          ItemsSource="{Binding Path=GroupByList}" Margin="0,10,0,10" Height="20"
+                          SelectionChanged="GroupingModeCombo_SelectionChanged"/>
+                <Label Grid.Column="0" Grid.Row="1" Content="Затем по: " HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" Grid.Row="1" Name="comboBoxThenBy"
+                          IsEnabled="False"
+                          DisplayMemberPath="DisplayName"
+                          ItemsSource="{Binding Path=GroupThenList}" Margin="0,10,0,10" Height="20"
+                          SelectionChanged="GroupingModeCombo_SelectionChanged"/>
+                <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" x:Name="CustomPropertyParamsPanel" Visibility="Collapsed" Margin="0,4,0,0">
+                    <TextBlock TextWrapping="Wrap" Foreground="DimGray" FontSize="11" Margin="0,0,0,8"
+                               Text="Для каждого этапа, где выбрано «Своё свойство»: укажите отображаемое имя параметра для выбора A и B (как в свойствах Navisworks). Можно ввести вручную или выбрать из списка."/>
+                    <StackPanel x:Name="CustomPropertyStage1Panel" Visibility="Collapsed" Margin="0,0,0,10">
+                        <Label Content="Первый уровень («Группировать по»)" FontWeight="Bold" Padding="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Label Grid.Row="0" Grid.Column="0" Content="Параметр (A):" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CustomPropertyStage1ComboA" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}" Margin="0,0,0,4"
+                                      ToolTip="Выбор A — первый элемент пары пересечения"/>
+                            <Label Grid.Row="1" Grid.Column="0" Content="Параметр (B):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CustomPropertyStage1ComboB" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}"
+                                      ToolTip="Выбор B — второй элемент пары пересечения"/>
+                        </Grid>
+                    </StackPanel>
+                    <StackPanel x:Name="CustomPropertyStage2Panel" Visibility="Collapsed">
+                        <Label Content="Второй уровень («Затем по»)" FontWeight="Bold" Padding="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Label Grid.Row="0" Grid.Column="0" Content="Параметр (A):" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CustomPropertyStage2ComboA" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}" Margin="0,0,0,4"
+                                      ToolTip="Выбор A — первый элемент пары пересечения"/>
+                            <Label Grid.Row="1" Grid.Column="0" Content="Параметр (B):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CustomPropertyStage2ComboB" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}"
+                                      ToolTip="Выбор B — второй элемент пары пересечения"/>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </GroupBox>
+        <StackPanel Grid.Row="2" Grid.Column="0" Orientation="Vertical" Margin="5,0,0,0">
+            <StackPanel Orientation="Horizontal">
+                <CheckBox Name="keepExistingGroupsCheckBox" IsChecked="False" VerticalAlignment="Center"/>
+                <Label Content="Сохранить существующие группы" Padding="0" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal">
+                <CheckBox Name="skipFixedGroupsCheckBox" IsChecked="True" VerticalAlignment="Center"/>
+                <TextBlock Text="Не создавать группу, если все пересечения в группе исправлены"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Margin="4,2,0,2"/>
+            </StackPanel>
+        </StackPanel>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,5,0,0">
+            <!--<ProgressBar></ProgressBar>-->
+            <Button Content="Группировать" IsDefault="True" Name="Group_Button"
+                    Click="Group_Button_Click"
+                    IsEnabled="False"/>
+            <Button Content="Разгруппировать" Name="Ungroup_Button"
+                    IsEnabled="False" Click="Ungroup_Button_Click"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

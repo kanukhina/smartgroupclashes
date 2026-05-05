@@ -1,0 +1,17 @@
+﻿# Локализованные имена вкладки ленты, панели и кнопок
+$utf8
+
+DisplayName=
+NNAW Ribbon Local Name
+
+ID_GroupClashesTab.DisplayName=
+Группировка пересечений
+
+ID_GroupClashesButton.DisplayName=
+Группировать пересечения
+
+ID_GroupClashesButton.ToolTip=
+Группирует пересечения по выбранному режиму
+
+ID_GroupClashesButton.ExtendedToolTip=
+Выберите тест коллизий, режим группировки и нажмите «Группировать»

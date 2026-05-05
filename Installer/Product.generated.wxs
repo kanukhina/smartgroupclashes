@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="SmartGroupClashes" Manufacturer="Kanukhin_A" Version="1.0.1.0" UpgradeCode="B9C47E21-6F83-4D1A-A7E2-5C8F0E1D2A3B" Language="1049" Scope="perUser" InstallerVersion="500" Compressed="yes">
+    <SummaryInformation Description="Установка плагина «SmartGroupClashes» для Autodesk Navisworks Manage" />
+    <Icon Id="ARPICO" SourceFile="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\Images\SmartGroupClashesIcon_Small.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ARPICO" />
+    <MajorUpgrade Schedule="afterInstallValidate" DowngradeErrorMessage="Уже установлена более новая версия «[ProductName]». Удалите её в списке установленных приложений и повторите установку." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <StandardDirectory Id="AppDataFolder">
+      <Directory Id="DIR_AUTODESK" Name="Autodesk">
+        <Directory Id="DIR_APPLICATIONPLUGINS" Name="ApplicationPlugins">
+          <Directory Id="DIR_LEGACY_GROUPCLASHES_BUNDLE" Name="GroupClashes.bundle">
+          </Directory>
+          <Directory Id="INSTALLFOLDER" Name="SmartGroupClashes.bundle">
+            <Directory Id="DIR_Contents" Name="Contents">
+              <Directory Id="DIR_Contents_2022" Name="2022">
+                <Directory Id="DIR_Contents_2022_en_US" Name="en-US">
+                </Directory>
+                <Directory Id="DIR_Contents_2022_Images" Name="Images">
+                </Directory>
+              </Directory>
+              <Directory Id="DIR_Contents_2026" Name="2026">
+                <Directory Id="DIR_Contents_2026_en_US" Name="en-US">
+                </Directory>
+                <Directory Id="DIR_Contents_2026_Images" Name="Images">
+                </Directory>
+              </Directory>
+            </Directory>
+          </Directory>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="MainFeature" Title="Файлы плагина «SmartGroupClashes»" Level="1">
+      <ComponentGroupRef Id="CG_MainFiles" />
+      <ComponentRef Id="CMP_RemoveLegacyGroupClashes" />
+    </Feature>
+    <Component Id="CMP_RemoveLegacyGroupClashes" Directory="DIR_LEGACY_GROUPCLASHES_BUNDLE" Guid="*">
+      <RemoveFile Id="RMF_LegacyGroupClashesBundleFiles" Name="*.*" On="install" />
+      <RemoveFolder Id="RMF_LegacyGroupClashesBundleFolder" On="install" />
+      <RegistryValue Root="HKCU" Key="Software\Kanukhin_A\SmartGroupClashes" Name="LegacyCleanup" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <ComponentGroup Id="CG_MainFiles">
+      <Component Id="CMP_1" Directory="DIR_Contents_2022_en_US" Guid="*">
+        <File Id="FIL_1" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\en-US\GroupClashes.name" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_2" Directory="DIR_Contents_2022_en_US" Guid="*">
+        <File Id="FIL_2" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\en-US\GroupClashes.xaml" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_3" Directory="DIR_Contents_2022_en_US" Guid="*">
+        <File Id="FIL_3" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\en-US\SmartGroupClashes.name" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_4" Directory="DIR_Contents_2022_en_US" Guid="*">
+        <File Id="FIL_4" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\en-US\SmartGroupClashes.xaml" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_5" Directory="DIR_Contents_2022_Images" Guid="*">
+        <File Id="FIL_5" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\Images\SmartGroupClashesIcon_Large.ico" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_6" Directory="DIR_Contents_2022_Images" Guid="*">
+        <File Id="FIL_6" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\Images\SmartGroupClashesIcon_Small.ico" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_7" Directory="DIR_Contents_2022" Guid="*">
+        <File Id="FIL_7" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\SmartGroupClashes.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_8" Directory="DIR_Contents_2026_en_US" Guid="*">
+        <File Id="FIL_8" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\en-US\GroupClashes.name" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_9" Directory="DIR_Contents_2026_en_US" Guid="*">
+        <File Id="FIL_9" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\en-US\GroupClashes.xaml" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_10" Directory="DIR_Contents_2026_en_US" Guid="*">
+        <File Id="FIL_10" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\en-US\SmartGroupClashes.name" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_11" Directory="DIR_Contents_2026_en_US" Guid="*">
+        <File Id="FIL_11" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\en-US\SmartGroupClashes.xaml" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_12" Directory="DIR_Contents_2026_Images" Guid="*">
+        <File Id="FIL_12" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\Images\SmartGroupClashesIcon_Large.ico" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_13" Directory="DIR_Contents_2026_Images" Guid="*">
+        <File Id="FIL_13" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\Images\SmartGroupClashesIcon_Small.ico" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_14" Directory="DIR_Contents_2026" Guid="*">
+        <File Id="FIL_14" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2026\SmartGroupClashes.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="CMP_15" Directory="INSTALLFOLDER" Guid="*">
+        <File Id="FIL_15" Source="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\PackageContents.xml" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Package>
+</Wix>
