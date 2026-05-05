@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
-  <Package Name="SmartGroupClashes" Manufacturer="Kanukhin_A" Version="1.0.1.0" UpgradeCode="B9C47E21-6F83-4D1A-A7E2-5C8F0E1D2A3B" Language="1049" Scope="perUser" InstallerVersion="500" Compressed="yes">
+  <Package Name="SmartGroupClashes" Manufacturer="Kanukhin_A" Version="1.0.2.0" UpgradeCode="B9C47E21-6F83-4D1A-A7E2-5C8F0E1D2A3B" Language="1049" Scope="perUser" InstallerVersion="500" Compressed="yes">
     <SummaryInformation Description="Установка плагина «SmartGroupClashes» для Autodesk Navisworks Manage" />
     <Icon Id="ARPICO" SourceFile="C:\Users\Kanuhin_A\source\Navisworks\SmartGroupClashes\Installer\staging\SmartGroupClashes.bundle\Contents\2022\Images\SmartGroupClashesIcon_Small.ico" />
     <Property Id="ARPPRODUCTICON" Value="ARPICO" />
@@ -37,7 +37,7 @@
     <Component Id="CMP_RemoveLegacyGroupClashes" Directory="DIR_LEGACY_GROUPCLASHES_BUNDLE" Guid="*">
       <RemoveFile Id="RMF_LegacyGroupClashesBundleFiles" Name="*.*" On="install" />
       <RemoveFolder Id="RMF_LegacyGroupClashesBundleFolder" On="install" />
-      <RegistryValue Root="HKCU" Key="Software\Kanukhin_A\SmartGroupClashes" Name="LegacyCleanup" Type="integer" Value="1" KeyPath="yes" />
+      <RegistryValue Root="HKCU" Key="Software\\Kanukhin_A\\SmartGroupClashes" Name="LegacyCleanup" Type="integer" Value="1" KeyPath="yes" />
     </Component>
     <ComponentGroup Id="CG_MainFiles">
       <Component Id="CMP_1" Directory="DIR_Contents_2022_en_US" Guid="*">

@@ -54,7 +54,6 @@
 
 ### Если плагин не появился в Navisworks
 
-- Проверьте, что установлен `Navisworks Manage` (не Simulate/Freedom).
 - Перезапустите Navisworks после установки.
 - Убедитесь, что в `%AppData%\Autodesk\ApplicationPlugins\` есть папка `SmartGroupClashes.bundle`.
 

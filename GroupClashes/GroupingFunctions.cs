@@ -52,6 +52,11 @@ namespace SmartGroupClashes
         /// <param name="subgroupingMode">Второй уровень («Затем по»); <see cref="GroupingMode.None"/>, если не задан.</param>
         /// <param name="keepExistingGroups">Сохранять ли уже существующие группы в тесте.</param>
         /// <param name="skipAllFixedGroups">Не создавать группы, где все пересечения уже в статусе «исправлено»/«утверждено».</param>
+        /// <param name="analyzeStatusNew">Включать ли в анализ коллизии со статусом New.</param>
+        /// <param name="analyzeStatusActive">Включать ли в анализ коллизии со статусом Active.</param>
+        /// <param name="analyzeStatusReviewed">Включать ли в анализ коллизии со статусом Reviewed.</param>
+        /// <param name="analyzeStatusApproved">Включать ли в анализ коллизии со статусом Approved.</param>
+        /// <param name="analyzeStatusResolved">Включать ли в анализ коллизии со статусом Resolved.</param>
         /// <param name="customPropertyStage1SelectionA">Отображаемое имя свойства для стороны A на первом уровне (режим «Своё свойство»).</param>
         /// <param name="customPropertyStage1SelectionB">Отображаемое имя свойства для стороны B на первом уровне.</param>
         /// <param name="customPropertyStage2SelectionA">Отображаемое имя свойства для стороны A на втором уровне.</param>
@@ -63,6 +68,11 @@ namespace SmartGroupClashes
             GroupingMode subgroupingMode,
             bool keepExistingGroups,
             bool skipAllFixedGroups,
+            bool analyzeStatusNew,
+            bool analyzeStatusActive,
+            bool analyzeStatusReviewed,
+            bool analyzeStatusApproved,
+            bool analyzeStatusResolved,
             string customPropertyStage1SelectionA = null,
             string customPropertyStage1SelectionB = null,
             string customPropertyStage2SelectionA = null,
@@ -74,6 +84,31 @@ namespace SmartGroupClashes
             {
                 return false;
             }
+            int totalBeforeStatusFilter = clashResults.Count;
+
+            // Отфильтровать статусы до построения кэшей/групп, чтобы не запускать тяжёлую обработку лишних пересечений.
+            clashResults = clashResults
+                .Where(result => IsStatusEnabled(
+                    result,
+                    analyzeStatusNew,
+                    analyzeStatusActive,
+                    analyzeStatusReviewed,
+                    analyzeStatusApproved,
+                    analyzeStatusResolved))
+                .ToList();
+
+            if (clashResults.Count == 0)
+            {
+                // После фильтрации по статусам нечего группировать.
+                return false;
+            }
+            int totalAfterStatusFilter = clashResults.Count;
+            HashSet<ClashResult> analyzedSourceResults =
+                new HashSet<ClashResult>(clashResults, new ReferenceEqualityComparer<ClashResult>());
+            HashSet<Guid> analyzedSourceResultGuids = new HashSet<Guid>(
+                clashResults
+                    .Select(r => r.Guid)
+                    .Where(g => g != Guid.Empty));
 
             Dictionary<string, ClashResult> sourceByDisplayName = clashResults
                 .Where(r => r != null && !string.IsNullOrWhiteSpace(r.DisplayName))
@@ -133,16 +168,20 @@ namespace SmartGroupClashes
             List<ClashResult> ungroupedClashResults = RemoveOneClashGroup(ref clashResultGroups);
             ungroupedClashResults.AddRange(fixedUngroupedResults);
 
-            // При необходимости добавить к результату копии уже существующих групп теста.
-            if (keepExistingGroups) clashResultGroups.AddRange(BackupExistingClashGroups(selectedClashTest));
-
             if (clashResultGroups.Count == 0 && ungroupedClashResults.Count == 0)
             {
                 return false;
             }
 
-            // Записать сформированные группы и «висячие» пересечения в документ (транзакция Navisworks).
-            ProcessClashGroup(clashResultGroups, ungroupedClashResults, selectedClashTest);
+            // Обновить только выбранные пересечения в текущем тесте (остальные статусы не трогаем).
+            ProcessClashGroupInPlace(
+                clashResultGroups,
+                ungroupedClashResults,
+                selectedClashTest,
+                analyzedSourceResults,
+                analyzedSourceResultGuids,
+                totalBeforeStatusFilter,
+                totalAfterStatusFilter);
             return true;
         }
 
@@ -359,6 +398,8 @@ namespace SmartGroupClashes
         private static ClashResult CreateTrackedCopy(ClashResult source, Dictionary<ClashResult, ClashResult> sourceByCopy)
         {
             ClashResult copy = (ClashResult)source.CreateCopy();
+            // При in-place вставке в тот же тест GUID должен быть новым, иначе Navisworks считает элемент дубликатом.
+            copy.Guid = Guid.Empty;
             if (sourceByCopy != null)
             {
                 sourceByCopy[copy] = source;
@@ -1164,9 +1205,182 @@ namespace SmartGroupClashes
         #region Вспомогательные методы
 
         /// <summary>
-        /// Заменяет дочерние элементы теста коллизий на сформированные группы и отдельные пересечения.
+        /// Перестраивает только выбранные пересечения в существующем тесте:
+        /// удаляет исходные элементы из набора для анализа и добавляет новые группы/результаты.
+        /// Невыбранные статусы и остальные пересечения остаются без изменений.
         /// </summary>
-        private static void ProcessClashGroup(List<ClashResultGroup> clashGroups, List<ClashResult> ungroupedClashResults, ClashTest selectedClashTest)
+        private static void ProcessClashGroupInPlace(
+            List<ClashResultGroup> clashGroups,
+            List<ClashResult> ungroupedClashResults,
+            ClashTest selectedClashTest,
+            HashSet<ClashResult> analyzedSourceResults,
+            HashSet<Guid> analyzedSourceResultGuids,
+            int totalBeforeStatusFilter = -1,
+            int totalAfterStatusFilter = -1)
+        {
+            using (Transaction tx = Application.MainDocument.BeginTransaction("SmartGroupClashes"))
+            {
+                DocumentClash documentClash = Application.MainDocument.GetClash();
+                DocumentClashTests testsData = documentClash.TestsData;
+                int indexOfClashTest = testsData.Tests.IndexOf(selectedClashTest);
+                if (indexOfClashTest < 0)
+                {
+                    return;
+                }
+
+                ClashTest backupTest = (ClashTest)selectedClashTest.CreateCopy();
+                GroupItem testRoot = (GroupItem)testsData.Tests[indexOfClashTest];
+
+                int removedResultsCount = 0;
+                RemoveAnalyzedResultsInPlace(
+                    testsData,
+                    testRoot,
+                    analyzedSourceResults,
+                    analyzedSourceResultGuids,
+                    ref removedResultsCount);
+
+                int currentProgress = 0;
+                int totalProgress = Math.Max(1, removedResultsCount + ungroupedClashResults.Count + clashGroups.Count);
+                string filterStatusText = string.Empty;
+                if (totalBeforeStatusFilter >= 0 && totalAfterStatusFilter >= 0)
+                {
+                    filterStatusText =
+                        " Отфильтровано пересечений для анализа (по выбранным статусам): "
+                        + totalAfterStatusFilter
+                        + " из "
+                        + totalBeforeStatusFilter
+                        + ". Будет изменено элементов: "
+                        + totalProgress
+                        + ".";
+                }
+
+                Progress progressBar = Application.BeginProgress(
+                    "Копирование результатов",
+                    "Копирование результатов теста «" + selectedClashTest.DisplayName + "» в панель группировки…" + filterStatusText);
+                try
+                {
+                    for (int i = 0; i < removedResultsCount; i++)
+                    {
+                        if (progressBar.IsCanceled)
+                        {
+                            break;
+                        }
+
+                        currentProgress++;
+                        progressBar.Update((double)currentProgress / totalProgress);
+                    }
+
+                    foreach (ClashResultGroup clashResultGroup in clashGroups)
+                    {
+                        if (progressBar.IsCanceled)
+                        {
+                            break;
+                        }
+
+                        ResetGroupResultGuids(clashResultGroup);
+                        testsData.TestsAddCopy((GroupItem)testsData.Tests[indexOfClashTest], clashResultGroup);
+                        currentProgress++;
+                        progressBar.Update((double)currentProgress / totalProgress);
+                    }
+
+                    foreach (ClashResult clashResult in ungroupedClashResults)
+                    {
+                        if (progressBar.IsCanceled)
+                        {
+                            break;
+                        }
+
+                        clashResult.Guid = Guid.Empty;
+                        testsData.TestsAddCopy((GroupItem)testsData.Tests[indexOfClashTest], clashResult);
+                        currentProgress++;
+                        progressBar.Update((double)currentProgress / totalProgress);
+                    }
+
+                    if (progressBar.IsCanceled)
+                    {
+                        testsData.TestsReplaceWithCopy(indexOfClashTest, backupTest);
+                    }
+
+                    tx.Commit();
+                }
+                finally
+                {
+                    Application.EndProgress();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Сбрасывает GUID у всех результатов в группе перед вставкой в существующий тест.
+        /// </summary>
+        private static void ResetGroupResultGuids(ClashResultGroup group)
+        {
+            if (group == null)
+            {
+                return;
+            }
+
+            foreach (ClashResult result in group.Children.OfType<ClashResult>())
+            {
+                result.Guid = Guid.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Рекурсивно удаляет из дерева теста пересечения, входящие в набор для анализа.
+        /// </summary>
+        private static void RemoveAnalyzedResultsInPlace(
+            DocumentClashTests testsData,
+            GroupItem parent,
+            HashSet<ClashResult> analyzedSourceResults,
+            HashSet<Guid> analyzedSourceResultGuids,
+            ref int removedResultsCount)
+        {
+            for (int i = parent.Children.Count - 1; i >= 0; i--)
+            {
+                SavedItem child = parent.Children[i];
+                ClashResult result = child as ClashResult;
+                if (result != null)
+                {
+                    bool byReference = analyzedSourceResults.Contains(result);
+                    bool byGuid = result.Guid != Guid.Empty && analyzedSourceResultGuids.Contains(result.Guid);
+                    if (byReference || byGuid)
+                    {
+                        testsData.TestsRemoveAt(parent, i);
+                        removedResultsCount++;
+                    }
+                    continue;
+                }
+
+                ClashResultGroup group = child as ClashResultGroup;
+                if (group == null)
+                {
+                    continue;
+                }
+
+                RemoveAnalyzedResultsInPlace(
+                    testsData,
+                    group,
+                    analyzedSourceResults,
+                    analyzedSourceResultGuids,
+                    ref removedResultsCount);
+                if (group.Children.Count == 0)
+                {
+                    testsData.TestsRemoveAt(parent, i);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Полностью заменяет дочерние элементы теста коллизий на сформированные группы и отдельные пересечения.
+        /// Используется для операций полного снятия/пересборки структуры.
+        /// </summary>
+        private static void ProcessClashGroup(
+            List<ClashResultGroup> clashGroups,
+            List<ClashResult> ungroupedClashResults,
+            ClashTest selectedClashTest,
+            int totalBeforeStatusFilter = -1,
+            int totalAfterStatusFilter = -1)
         {
             using (Transaction tx = Application.MainDocument.BeginTransaction("SmartGroupClashes"))
             {
@@ -1180,9 +1394,21 @@ namespace SmartGroupClashes
 
                 int CurrentProgress = 0;
                 int TotalProgress = ungroupedClashResults.Count + clashGroups.Count;
+                string filterStatusText = string.Empty;
+                if (totalBeforeStatusFilter >= 0 && totalAfterStatusFilter >= 0)
+                {
+                    filterStatusText =
+                        " Отфильтровано пересечений для анализа (по выбранным статусам): "
+                        + totalAfterStatusFilter
+                        + " из "
+                        + totalBeforeStatusFilter
+                        + ". Будет скопировано элементов в тест: "
+                        + TotalProgress
+                        + ".";
+                }
                 Progress ProgressBar = Application.BeginProgress(
                     "Копирование результатов",
-                    "Копирование результатов теста «" + selectedClashTest.DisplayName + "» в панель группировки…");
+                    "Копирование результатов теста «" + selectedClashTest.DisplayName + "» в панель группировки…" + filterStatusText);
                 try
                 {
                     foreach (ClashResultGroup clashResultGroup in clashGroups)
@@ -1249,12 +1475,52 @@ namespace SmartGroupClashes
             return ungroupedClashResults;
         }
 
+        /// <summary>
+        /// Возвращает <c>true</c>, если пересечение находится в закрытом статусе (Approved/Resolved).
+        /// </summary>
         private static bool IsFixedStatus(ClashResult result)
         {
-            // Сравнение по строковому представлению enum: в разных версиях Navisworks подписи в UI могут отличаться.
-            string status = result.Status.ToString();
-            return string.Equals(status, "Resolved", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(status, "Approved", StringComparison.OrdinalIgnoreCase);
+            if (result == null)
+            {
+                return false;
+            }
+
+            return result.Status == ClashResultStatus.Resolved
+                || result.Status == ClashResultStatus.Approved;
+        }
+
+        /// <summary>
+        /// Проверяет, разрешён ли к анализу статус указанного пересечения по флажкам фильтра.
+        /// </summary>
+        private static bool IsStatusEnabled(
+            ClashResult result,
+            bool analyzeStatusNew,
+            bool analyzeStatusActive,
+            bool analyzeStatusReviewed,
+            bool analyzeStatusApproved,
+            bool analyzeStatusResolved)
+        {
+            if (result == null)
+            {
+                return false;
+            }
+
+            switch (result.Status)
+            {
+                case ClashResultStatus.New:
+                    return analyzeStatusNew;
+                case ClashResultStatus.Active:
+                    return analyzeStatusActive;
+                case ClashResultStatus.Reviewed:
+                    return analyzeStatusReviewed;
+                case ClashResultStatus.Approved:
+                    return analyzeStatusApproved;
+                case ClashResultStatus.Resolved:
+                    return analyzeStatusResolved;
+                default:
+                    // Разрешаем только явно поддерживаемые статусы; прочие исключаются из анализа.
+                    return false;
+            }
         }
 
         private static string LocalizeClashStatus(string apiStatus)
@@ -1301,17 +1567,6 @@ namespace SmartGroupClashes
                     }
                 }
                 else yield return (ClashResult)clashTest.Children[i];
-            }
-        }
-
-        private static IEnumerable<ClashResultGroup> BackupExistingClashGroups(ClashTest clashTest)
-        {
-            for (var i = 0; i < clashTest.Children.Count; i++)
-            {
-                if (clashTest.Children[i].IsGroup)
-                {
-                    yield return (ClashResultGroup)clashTest.Children[i].CreateCopy();
-                }
             }
         }
 

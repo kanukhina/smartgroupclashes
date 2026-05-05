@@ -16,6 +16,8 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.IO;
+using IOPath = System.IO.Path;
 
 using Autodesk.Navisworks.Api.Clash;
 using Autodesk.Navisworks.Api;
@@ -43,6 +45,8 @@ namespace SmartGroupClashes
         private ICollectionView _clashTestsView;
         private int _lastSelectedIndex = -1;
         private bool _isRangeSelectionInProgress;
+        private bool _isApplyingSettings;
+        private string _loadedSettingsDocumentKey;
 
         /// <summary>Последний выбранный тест (для совместимости привязок, если используется).</summary>
         public ClashTest SelectedClashTest { get; set; }
@@ -66,6 +70,8 @@ namespace SmartGroupClashes
             this.DataContext = this;
             _clashTestsView = CollectionViewSource.GetDefaultView(ClashTests);
             _clashTestsView.Filter = FilterClashTests;
+
+            AttachSettingsAutoSaveHandlers();
         }
 
         /// <summary>Группирует пересечения в выбранных тестах по заданным режимам.</summary>
@@ -84,6 +90,11 @@ namespace SmartGroupClashes
             {
                 GroupingMode groupByMode = GetSelectedGroupingMode(comboBoxGroupBy);
                 GroupingMode thenByModeSel = GetSelectedGroupingMode(comboBoxThenBy);
+                bool analyzeNewStatus = analyzeNewStatusCheckBox.IsChecked == true;
+                bool analyzeActiveStatus = analyzeActiveStatusCheckBox.IsChecked == true;
+                bool analyzeReviewedStatus = analyzeReviewedStatusCheckBox.IsChecked == true;
+                bool analyzeApprovedStatus = analyzeApprovedStatusCheckBox.IsChecked == true;
+                bool analyzeResolvedStatus = analyzeResolvedStatusCheckBox.IsChecked == true;
 
                 string customStage1A = null;
                 string customStage1B = null;
@@ -141,6 +152,11 @@ namespace SmartGroupClashes
                                     GroupingMode.None,
                                     (bool)keepExistingGroupsCheckBox.IsChecked,
                                     (bool)skipFixedGroupsCheckBox.IsChecked,
+                                    analyzeNewStatus,
+                                    analyzeActiveStatus,
+                                    analyzeReviewedStatus,
+                                    analyzeApprovedStatus,
+                                    analyzeResolvedStatus,
                                     customStage1A,
                                     customStage1B,
                                     customStage2A,
@@ -157,6 +173,11 @@ namespace SmartGroupClashes
                                     GroupingMode.None,
                                     (bool)keepExistingGroupsCheckBox.IsChecked,
                                     (bool)skipFixedGroupsCheckBox.IsChecked,
+                                    analyzeNewStatus,
+                                    analyzeActiveStatus,
+                                    analyzeReviewedStatus,
+                                    analyzeApprovedStatus,
+                                    analyzeResolvedStatus,
                                     customStage1A,
                                     customStage1B,
                                     customStage2A,
@@ -173,6 +194,11 @@ namespace SmartGroupClashes
                                     thenByMode,
                                     (bool)keepExistingGroupsCheckBox.IsChecked,
                                     (bool)skipFixedGroupsCheckBox.IsChecked,
+                                    analyzeNewStatus,
+                                    analyzeActiveStatus,
+                                    analyzeReviewedStatus,
+                                    analyzeApprovedStatus,
+                                    analyzeResolvedStatus,
                                     customStage1A,
                                     customStage1B,
                                     customStage2A,
@@ -226,6 +252,8 @@ namespace SmartGroupClashes
         private void GroupingModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             UpdateCustomPropertyParamsVisibility();
+            CheckPlugin();
+            AutoSaveSettingsIfMissingForDocument();
         }
 
         /// <summary>Настраивает видимость панелей параметров пользовательских свойств (этапы 1 и 2).</summary>
@@ -319,6 +347,7 @@ namespace SmartGroupClashes
             GetClashTests();
             CheckPlugin();
             LoadComboBox();
+            TryLoadSettingsForCurrentDocument();
         }
 
         /// <summary>Отписывается от событий документа и тестов коллизий.</summary>
@@ -336,6 +365,7 @@ namespace SmartGroupClashes
             GetClashTests();
             CheckPlugin();
             LoadComboBox();
+            TryLoadSettingsForCurrentDocument();
             RefreshClashTestsFilter();
             UpdateSelectionSummary();
 
@@ -362,6 +392,16 @@ namespace SmartGroupClashes
         /// </summary>
         private void CheckPlugin()
         {
+            bool hasGroupingCondition =
+                GetSelectedGroupingMode(comboBoxGroupBy) != GroupingMode.None
+                || GetSelectedGroupingMode(comboBoxThenBy) != GroupingMode.None;
+            bool hasStatusSelection =
+                analyzeNewStatusCheckBox.IsChecked == true
+                || analyzeActiveStatusCheckBox.IsChecked == true
+                || analyzeReviewedStatusCheckBox.IsChecked == true
+                || analyzeApprovedStatusCheckBox.IsChecked == true
+                || analyzeResolvedStatusCheckBox.IsChecked == true;
+
             if (Application.MainDocument == null
                 || Application.MainDocument.IsClear
                 || Application.MainDocument.GetClash() == null
@@ -374,7 +414,9 @@ namespace SmartGroupClashes
             }
             else
             {
-                Group_Button.IsEnabled = ClashTestListBox.SelectedItems.Count > 0;
+                Group_Button.IsEnabled = ClashTestListBox.SelectedItems.Count > 0
+                    && hasGroupingCondition
+                    && hasStatusSelection;
                 comboBoxGroupBy.IsEnabled = true;
                 comboBoxThenBy.IsEnabled = true;
                 Ungroup_Button.IsEnabled = ClashTestListBox.SelectedItems.Count > 0;
@@ -571,6 +613,460 @@ namespace SmartGroupClashes
             {
                 SelectedTestsCountLabel.Content = $"Выбрано тестов: {ClashTestListBox.SelectedItems.Count}";
             }
+        }
+
+        /// <summary>
+        /// Подписывает элементы формы на изменение настроек, чтобы сохранить их по правилам автосохранения.
+        /// </summary>
+        private void AttachSettingsAutoSaveHandlers()
+        {
+            keepExistingGroupsCheckBox.Checked += SettingsControl_Changed;
+            keepExistingGroupsCheckBox.Unchecked += SettingsControl_Changed;
+
+            skipFixedGroupsCheckBox.Checked += SettingsControl_Changed;
+            skipFixedGroupsCheckBox.Unchecked += SettingsControl_Changed;
+
+            analyzeNewStatusCheckBox.Checked += SettingsControl_Changed;
+            analyzeNewStatusCheckBox.Unchecked += SettingsControl_Changed;
+            analyzeActiveStatusCheckBox.Checked += SettingsControl_Changed;
+            analyzeActiveStatusCheckBox.Unchecked += SettingsControl_Changed;
+            analyzeReviewedStatusCheckBox.Checked += SettingsControl_Changed;
+            analyzeReviewedStatusCheckBox.Unchecked += SettingsControl_Changed;
+            analyzeApprovedStatusCheckBox.Checked += SettingsControl_Changed;
+            analyzeApprovedStatusCheckBox.Unchecked += SettingsControl_Changed;
+            analyzeResolvedStatusCheckBox.Checked += SettingsControl_Changed;
+            analyzeResolvedStatusCheckBox.Unchecked += SettingsControl_Changed;
+
+            if (CustomPropertyStage1ComboA != null)
+            {
+                CustomPropertyStage1ComboA.LostFocus += SettingsControl_Changed;
+            }
+
+            if (CustomPropertyStage1ComboB != null)
+            {
+                CustomPropertyStage1ComboB.LostFocus += SettingsControl_Changed;
+            }
+
+            if (CustomPropertyStage2ComboA != null)
+            {
+                CustomPropertyStage2ComboA.LostFocus += SettingsControl_Changed;
+            }
+
+            if (CustomPropertyStage2ComboB != null)
+            {
+                CustomPropertyStage2ComboB.LostFocus += SettingsControl_Changed;
+            }
+        }
+
+        /// <summary>
+        /// Единый обработчик изменений параметров группировки в интерфейсе.
+        /// </summary>
+        private void SettingsControl_Changed(object sender, EventArgs e)
+        {
+            CheckPlugin();
+            AutoSaveSettingsIfMissingForDocument();
+        }
+
+        /// <summary>
+        /// Явно сохраняет настройки текущей модели в cfg-файл.
+        /// </summary>
+        private void SaveSettingsButton_Click(object sender, WIN.RoutedEventArgs e)
+        {
+            SaveCurrentSettingsForDocument(force: true);
+        }
+
+        /// <summary>
+        /// Загружает настройки из cfg-файла для текущего документа Navisworks (по имени файла).
+        /// </summary>
+        private void TryLoadSettingsForCurrentDocument()
+        {
+            string documentKey = GetCurrentDocumentSettingsKey();
+            if (string.IsNullOrWhiteSpace(documentKey))
+            {
+                return;
+            }
+
+            if (string.Equals(_loadedSettingsDocumentKey, documentKey, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            string cfgPath = GetSettingsFilePath(documentKey);
+            if (!File.Exists(cfgPath))
+            {
+                _loadedSettingsDocumentKey = documentKey;
+                return;
+            }
+
+            Dictionary<string, string> map = ReadSettingsMap(cfgPath);
+            _isApplyingSettings = true;
+            try
+            {
+                keepExistingGroupsCheckBox.IsChecked = ParseBool(map, "KeepExistingGroups", false);
+                skipFixedGroupsCheckBox.IsChecked = ParseBool(map, "SkipFixedGroups", true);
+                analyzeNewStatusCheckBox.IsChecked = ParseBool(map, "AnalyzeStatusNew", true);
+                analyzeActiveStatusCheckBox.IsChecked = ParseBool(map, "AnalyzeStatusActive", true);
+                analyzeReviewedStatusCheckBox.IsChecked = ParseBool(map, "AnalyzeStatusReviewed", true);
+                analyzeApprovedStatusCheckBox.IsChecked = ParseBool(map, "AnalyzeStatusApproved", true);
+                analyzeResolvedStatusCheckBox.IsChecked = ParseBool(map, "AnalyzeStatusResolved", false);
+
+                SetModeSelection(comboBoxGroupBy, ParseText(map, "GroupByMode"));
+                SetModeSelection(comboBoxThenBy, ParseText(map, "ThenByMode"));
+                ApplySelectedTests(ParseText(map, "SelectedTests"));
+
+                CustomPropertyStage1ComboA.Text = ParseText(map, "CustomPropertyStage1A");
+                CustomPropertyStage1ComboB.Text = ParseText(map, "CustomPropertyStage1B");
+                CustomPropertyStage2ComboA.Text = ParseText(map, "CustomPropertyStage2A");
+                CustomPropertyStage2ComboB.Text = ParseText(map, "CustomPropertyStage2B");
+            }
+            finally
+            {
+                _isApplyingSettings = false;
+            }
+
+            UpdateCustomPropertyParamsVisibility();
+            CheckPlugin();
+            _loadedSettingsDocumentKey = documentKey;
+        }
+
+        /// <summary>
+        /// Выполняет автосохранение только если для текущей модели ещё нет файла настроек.
+        /// </summary>
+        private void AutoSaveSettingsIfMissingForDocument()
+        {
+            SaveCurrentSettingsForDocument(force: false);
+        }
+
+        /// <summary>
+        /// Сохраняет текущие настройки в cfg-файл модели.
+        /// </summary>
+        /// <param name="force">
+        /// <c>true</c> — сохранить всегда; <c>false</c> — сохранить только при отсутствии файла.
+        /// </param>
+        private void SaveCurrentSettingsForDocument(bool force)
+        {
+            if (_isApplyingSettings)
+            {
+                return;
+            }
+
+            string documentKey = GetCurrentDocumentSettingsKey();
+            if (string.IsNullOrWhiteSpace(documentKey))
+            {
+                return;
+            }
+
+            string cfgPath = GetSettingsFilePath(documentKey);
+            if (!force && File.Exists(cfgPath))
+            {
+                return;
+            }
+
+            string cfgDir = IOPath.GetDirectoryName(cfgPath);
+            if (!string.IsNullOrWhiteSpace(cfgDir))
+            {
+                Directory.CreateDirectory(cfgDir);
+            }
+
+            List<string> lines = new List<string>
+            {
+                "KeepExistingGroups=" + (keepExistingGroupsCheckBox.IsChecked == true ? "true" : "false"),
+                "SkipFixedGroups=" + (skipFixedGroupsCheckBox.IsChecked == true ? "true" : "false"),
+                "AnalyzeStatusNew=" + (analyzeNewStatusCheckBox.IsChecked == true ? "true" : "false"),
+                "AnalyzeStatusActive=" + (analyzeActiveStatusCheckBox.IsChecked == true ? "true" : "false"),
+                "AnalyzeStatusReviewed=" + (analyzeReviewedStatusCheckBox.IsChecked == true ? "true" : "false"),
+                "AnalyzeStatusApproved=" + (analyzeApprovedStatusCheckBox.IsChecked == true ? "true" : "false"),
+                "AnalyzeStatusResolved=" + (analyzeResolvedStatusCheckBox.IsChecked == true ? "true" : "false"),
+                "GroupByMode=" + GetSelectedGroupingMode(comboBoxGroupBy),
+                "ThenByMode=" + GetSelectedGroupingMode(comboBoxThenBy),
+                "SelectedTests=" + EscapeCfgValue(GetSelectedTestsValue()),
+                "CustomPropertyStage1A=" + EscapeCfgValue(CustomPropertyStage1ComboA.Text),
+                "CustomPropertyStage1B=" + EscapeCfgValue(CustomPropertyStage1ComboB.Text),
+                "CustomPropertyStage2A=" + EscapeCfgValue(CustomPropertyStage2ComboA.Text),
+                "CustomPropertyStage2B=" + EscapeCfgValue(CustomPropertyStage2ComboB.Text),
+            };
+
+            File.WriteAllLines(cfgPath, lines, Encoding.UTF8);
+            _loadedSettingsDocumentKey = documentKey;
+        }
+
+        /// <summary>
+        /// Экранирует спецсимволы перед записью значения в строку cfg.
+        /// </summary>
+        private static string EscapeCfgValue(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\\", "\\\\")
+                .Replace("\r", string.Empty)
+                .Replace("\n", "\\n");
+        }
+
+        /// <summary>
+        /// Восстанавливает экранированные спецсимволы после чтения строки cfg.
+        /// </summary>
+        private static string UnescapeCfgValue(string value)
+        {
+            return (value ?? string.Empty)
+                .Replace("\\n", "\n")
+                .Replace("\\\\", "\\");
+        }
+
+        /// <summary>
+        /// Читает cfg-файл в словарь ключ-значение.
+        /// </summary>
+        private static Dictionary<string, string> ReadSettingsMap(string cfgPath)
+        {
+            Dictionary<string, string> map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string line in File.ReadAllLines(cfgPath, Encoding.UTF8))
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                int separatorIndex = line.IndexOf('=');
+                if (separatorIndex <= 0)
+                {
+                    continue;
+                }
+
+                string key = line.Substring(0, separatorIndex).Trim();
+                string value = line.Substring(separatorIndex + 1);
+                map[key] = UnescapeCfgValue(value);
+            }
+
+            return map;
+        }
+
+        /// <summary>
+        /// Возвращает строковое значение настройки или пустую строку, если ключ отсутствует.
+        /// </summary>
+        private static string ParseText(Dictionary<string, string> map, string key)
+        {
+            string value;
+            if (map.TryGetValue(key, out value))
+            {
+                return value ?? string.Empty;
+            }
+
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// Возвращает булево значение настройки или значение по умолчанию при ошибке разбора.
+        /// </summary>
+        private static bool ParseBool(Dictionary<string, string> map, string key, bool defaultValue)
+        {
+            string value;
+            if (!map.TryGetValue(key, out value))
+            {
+                return defaultValue;
+            }
+
+            bool parsed;
+            if (bool.TryParse(value, out parsed))
+            {
+                return parsed;
+            }
+
+            return defaultValue;
+        }
+
+        /// <summary>
+        /// Выбирает режим группировки в комбобоксе по имени значения enum.
+        /// </summary>
+        private static void SetModeSelection(ComboBox comboBox, string modeName)
+        {
+            if (comboBox == null || string.IsNullOrWhiteSpace(modeName))
+            {
+                return;
+            }
+
+            foreach (object item in comboBox.Items)
+            {
+                GroupingModeOption option = item as GroupingModeOption;
+                if (option != null && string.Equals(option.Mode.ToString(), modeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    comboBox.SelectedItem = option;
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Возвращает каталог хранения пользовательских настроек SmartGroupClashes.
+        /// </summary>
+        private static string GetSettingsRootDirectory()
+        {
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            return IOPath.Combine(appData, "SmartGroupClashes", "settings");
+        }
+
+        /// <summary>
+        /// Формирует полный путь к cfg-файлу настроек для указанного ключа документа.
+        /// </summary>
+        private static string GetSettingsFilePath(string documentKey)
+        {
+            string safeDocumentKey = SanitizeFileName(documentKey);
+            return IOPath.Combine(GetSettingsRootDirectory(), safeDocumentKey + ".cfg");
+        }
+
+        /// <summary>
+        /// Приводит произвольную строку к безопасному имени файла.
+        /// </summary>
+        private static string SanitizeFileName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return "unnamed";
+            }
+
+            char[] invalidChars = IOPath.GetInvalidFileNameChars();
+            StringBuilder builder = new StringBuilder(name.Length);
+            foreach (char c in name)
+            {
+                bool isInvalid = invalidChars.Contains(c);
+                builder.Append(isInvalid ? '_' : c);
+            }
+
+            string cleaned = builder.ToString().Trim();
+            return string.IsNullOrWhiteSpace(cleaned) ? "unnamed" : cleaned;
+        }
+
+        /// <summary>
+        /// Возвращает ключ настроек текущего документа: имя файла без расширения.
+        /// </summary>
+        private static string GetCurrentDocumentSettingsKey()
+        {
+            if (Application.MainDocument == null || Application.MainDocument.IsClear)
+            {
+                return null;
+            }
+
+            string fullPath = string.Empty;
+            try
+            {
+                fullPath = Application.MainDocument.FileName;
+            }
+            catch
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(fullPath))
+            {
+                return null;
+            }
+
+            return IOPath.GetFileNameWithoutExtension(fullPath);
+        }
+
+        /// <summary>
+        /// Возвращает выбранные тесты коллизий как строку с разделителем ';'.
+        /// </summary>
+        private string GetSelectedTestsValue()
+        {
+            List<string> selectedNames = new List<string>();
+            foreach (object selected in ClashTestListBox.SelectedItems)
+            {
+                CustomClashTest test = selected as CustomClashTest;
+                string name = test?.DisplayName?.Trim();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    selectedNames.Add(name.Replace(";", "\\;"));
+                }
+            }
+
+            return string.Join(";", selectedNames);
+        }
+
+        /// <summary>
+        /// Применяет выбор тестов коллизий по сохранённому списку имён.
+        /// </summary>
+        private void ApplySelectedTests(string serializedSelectedTests)
+        {
+            if (ClashTestListBox == null)
+            {
+                return;
+            }
+
+            ClashTestListBox.SelectedItems.Clear();
+            if (string.IsNullOrWhiteSpace(serializedSelectedTests))
+            {
+                return;
+            }
+
+            HashSet<string> savedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string token in SplitEscapedBySemicolon(serializedSelectedTests))
+            {
+                string cleaned = token?.Trim();
+                if (!string.IsNullOrWhiteSpace(cleaned))
+                {
+                    savedNames.Add(cleaned);
+                }
+            }
+
+            if (savedNames.Count == 0)
+            {
+                return;
+            }
+
+            foreach (object item in ClashTestListBox.Items)
+            {
+                CustomClashTest test = item as CustomClashTest;
+                string name = test?.DisplayName?.Trim();
+                if (!string.IsNullOrWhiteSpace(name) && savedNames.Contains(name))
+                {
+                    ClashTestListBox.SelectedItems.Add(item);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Делит строку по ';' с поддержкой экранирования '\;'.
+        /// </summary>
+        private static List<string> SplitEscapedBySemicolon(string value)
+        {
+            List<string> parts = new List<string>();
+            if (string.IsNullOrEmpty(value))
+            {
+                return parts;
+            }
+
+            StringBuilder current = new StringBuilder();
+            bool escape = false;
+            foreach (char c in value)
+            {
+                if (escape)
+                {
+                    current.Append(c);
+                    escape = false;
+                    continue;
+                }
+
+                if (c == '\\')
+                {
+                    escape = true;
+                    continue;
+                }
+
+                if (c == ';')
+                {
+                    parts.Add(current.ToString());
+                    current.Clear();
+                    continue;
+                }
+
+                current.Append(c);
+            }
+
+            if (escape)
+            {
+                current.Append('\\');
+            }
+
+            parts.Add(current.ToString());
+            return parts;
         }
     }
 
