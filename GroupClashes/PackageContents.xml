@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" Name="SmartGroupClashes" Description="Сортировка и группировка пересечений в Navisworks." AppVersion="1.0.2" FriendlyVersion="1.0.2" ProductType="Application" HelpFile="./Contents/2025/Help/Help.html" SupportedLocales="Enu" AppNameSpace="appstore.exchange.autodesk.com" OnlineDocumentation=" " Author="Kanukhin_A" ProductCode="{C3D58A16-9E74-4B2F-918D-6E7F1A0C4B5D}" UpgradeCode="{B9C47E21-6F83-4D1A-A7E2-5C8F0E1D2A3B}" Icon="./Contents/v17/Help/appicon.ico">
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" Name="SmartGroupClashes" Description="Сортировка и группировка пересечений в Navisworks." AppVersion="1.0.3" FriendlyVersion="1.0.3" ProductType="Application" HelpFile="./Contents/2025/Help/Help.html" SupportedLocales="Enu" AppNameSpace="appstore.exchange.autodesk.com" OnlineDocumentation=" " Author="Kanukhin_A" ProductCode="{C3D58A16-9E74-4B2F-918D-6E7F1A0C4B5D}" UpgradeCode="{B9C47E21-6F83-4D1A-A7E2-5C8F0E1D2A3B}" Icon="./Contents/v17/Help/appicon.ico">
 	<CompanyDetails Name="Kanukhin_A" Url=" " Email=" " Phone=" " />
 	<Components Description="2024 parts">
 		<RuntimeRequirements OS="Win64" Platform="NAVMAN" SeriesMin="Nw21" SeriesMax="Nw21" />

@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:sgc="clr-namespace:SmartGroupClashes"
-             mc:Ignorable="d" MinHeight="520" MinWidth="420"
+             mc:Ignorable="d" MinHeight="560" MinWidth="420"
              FontFamily="Arial">
     <UserControl.Resources>
         <Style TargetType="{x:Type Button}">
@@ -140,6 +140,7 @@
                     <RowDefinition Height="auto" />
                     <RowDefinition Height="auto" />
                     <RowDefinition Height="auto" />
+                    <RowDefinition Height="auto" />
                 </Grid.RowDefinitions>
                 <Label Grid.Column="0" Grid.Row="0" Content="Группировать по: " VerticalAlignment="Center"/>
                 <ComboBox Grid.Column="1" Grid.Row="0" Name="comboBoxGroupBy"
@@ -153,7 +154,13 @@
                           DisplayMemberPath="DisplayName"
                           ItemsSource="{Binding Path=GroupThenList}" Margin="0,10,0,10" Height="20"
                           SelectionChanged="GroupingModeCombo_SelectionChanged"/>
-                <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" x:Name="CustomPropertyParamsPanel" Visibility="Collapsed" Margin="0,4,0,0">
+                <Label Grid.Column="0" Grid.Row="2" Content="И затем по: " HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                <ComboBox Grid.Column="1" Grid.Row="2" Name="comboBoxThirdBy"
+                          IsEnabled="False"
+                          DisplayMemberPath="DisplayName"
+                          ItemsSource="{Binding Path=GroupThirdList}" Margin="0,10,0,10" Height="20"
+                          SelectionChanged="GroupingModeCombo_SelectionChanged"/>
+                <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" x:Name="CustomPropertyParamsPanel" Visibility="Collapsed" Margin="0,4,0,0">
                     <TextBlock TextWrapping="Wrap" Foreground="DimGray" FontSize="11" Margin="0,0,0,8"
                                Text="Для каждого этапа, где выбрано «Своё свойство»: укажите отображаемое имя параметра для выбора A и B (как в свойствах Navisworks). Можно ввести вручную или выбрать из списка."/>
                     <StackPanel x:Name="CustomPropertyStage1Panel" Visibility="Collapsed" Margin="0,0,0,10">
@@ -177,7 +184,7 @@
                                       ToolTip="Выбор B — второй элемент пары пересечения"/>
                         </Grid>
                     </StackPanel>
-                    <StackPanel x:Name="CustomPropertyStage2Panel" Visibility="Collapsed">
+                    <StackPanel x:Name="CustomPropertyStage2Panel" Visibility="Collapsed" Margin="0,0,0,10">
                         <Label Content="Второй уровень («Затем по»)" FontWeight="Bold" Padding="0,0,0,4"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -194,6 +201,27 @@
                                       ToolTip="Выбор A — первый элемент пары пересечения"/>
                             <Label Grid.Row="1" Grid.Column="0" Content="Параметр (B):" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CustomPropertyStage2ComboB" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}"
+                                      ToolTip="Выбор B — второй элемент пары пересечения"/>
+                        </Grid>
+                    </StackPanel>
+                    <StackPanel x:Name="CustomPropertyStage3Panel" Visibility="Collapsed">
+                        <Label Content="Третий уровень («И затем по»)" FontWeight="Bold" Padding="0,0,0,4"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Label Grid.Row="0" Grid.Column="0" Content="Параметр (A):" VerticalAlignment="Center" Margin="0,0,8,4"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CustomPropertyStage3ComboA" IsEditable="True"
+                                      ItemsSource="{Binding CustomPropertySuggestions}" Margin="0,0,0,4"
+                                      ToolTip="Выбор A — первый элемент пары пересечения"/>
+                            <Label Grid.Row="1" Grid.Column="0" Content="Параметр (B):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CustomPropertyStage3ComboB" IsEditable="True"
                                       ItemsSource="{Binding CustomPropertySuggestions}"
                                       ToolTip="Выбор B — второй элемент пары пересечения"/>
                         </Grid>

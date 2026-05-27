@@ -39,6 +39,9 @@ namespace SmartGroupClashes
         /// <summary>Варианты режима для комбобокса «Затем по».</summary>
         public ObservableCollection<GroupingModeOption> GroupThenList { get; set; }
 
+        /// <summary>Варианты режима для комбобокса «И затем по».</summary>
+        public ObservableCollection<GroupingModeOption> GroupThirdList { get; set; }
+
         /// <summary>Подсказки для полей «Своё свойство» (отображаемые имена свойств).</summary>
         public ObservableCollection<string> CustomPropertySuggestions { get; } = new ObservableCollection<string>();
 
@@ -59,6 +62,7 @@ namespace SmartGroupClashes
             ClashTests = new ObservableCollection<CustomClashTest>();
             GroupByList = new ObservableCollection<GroupingModeOption>();
             GroupThenList = new ObservableCollection<GroupingModeOption>();
+            GroupThirdList = new ObservableCollection<GroupingModeOption>();
 
             foreach (string suggestion in GroupingFunctions.DefaultCustomPropertyDisplayNameSuggestions)
             {
@@ -90,6 +94,7 @@ namespace SmartGroupClashes
             {
                 GroupingMode groupByMode = GetSelectedGroupingMode(comboBoxGroupBy);
                 GroupingMode thenByModeSel = GetSelectedGroupingMode(comboBoxThenBy);
+                GroupingMode thirdByModeSel = GetSelectedGroupingMode(comboBoxThirdBy);
                 bool analyzeNewStatus = analyzeNewStatusCheckBox.IsChecked == true;
                 bool analyzeActiveStatus = analyzeActiveStatusCheckBox.IsChecked == true;
                 bool analyzeReviewedStatus = analyzeReviewedStatusCheckBox.IsChecked == true;
@@ -100,6 +105,8 @@ namespace SmartGroupClashes
                 string customStage1B = null;
                 string customStage2A = null;
                 string customStage2B = null;
+                string customStage3A = null;
+                string customStage3B = null;
 
                 if (groupByMode == GroupingMode.CustomProperty)
                 {
@@ -131,6 +138,21 @@ namespace SmartGroupClashes
                     }
                 }
 
+                if (thirdByModeSel == GroupingMode.CustomProperty)
+                {
+                    customStage3A = CustomPropertyStage3ComboA.Text?.Trim();
+                    customStage3B = CustomPropertyStage3ComboB.Text?.Trim();
+                    if (string.IsNullOrEmpty(customStage3A) || string.IsNullOrEmpty(customStage3B))
+                    {
+                        Forms.MessageBox.Show(
+                            "Для третьего уровня («И затем по» → «Своё свойство») укажите имя параметра для выбора A и для выбора B.",
+                            "SmartGroupClashes",
+                            Forms.MessageBoxButtons.OK,
+                            Forms.MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
                 foreach (object selectedItem in ClashTestListBox.SelectedItems)
                 {
                     CustomClashTest selectedClashTest = (CustomClashTest)selectedItem;
@@ -138,75 +160,30 @@ namespace SmartGroupClashes
 
                     if (clashTest.Children.Count != 0)
                     {
-                        if (thenByModeSel != GroupingMode.None
-                            || groupByMode != GroupingMode.None)
+                        if (groupByMode != GroupingMode.None
+                            || thenByModeSel != GroupingMode.None
+                            || thirdByModeSel != GroupingMode.None)
                         {
-
-                            if (thenByModeSel == GroupingMode.None
-                                && groupByMode != GroupingMode.None)
-                            {
-                                GroupingMode mode = groupByMode;
-                                bool grouped = GroupingFunctions.GroupClashes(
-                                    clashTest,
-                                    mode,
-                                    GroupingMode.None,
-                                    (bool)keepExistingGroupsCheckBox.IsChecked,
-                                    (bool)skipFixedGroupsCheckBox.IsChecked,
-                                    analyzeNewStatus,
-                                    analyzeActiveStatus,
-                                    analyzeReviewedStatus,
-                                    analyzeApprovedStatus,
-                                    analyzeResolvedStatus,
-                                    customStage1A,
-                                    customStage1B,
-                                    customStage2A,
-                                    customStage2B);
-                                groupingPerformed = groupingPerformed || grouped;
-                            }
-                            else if (groupByMode == GroupingMode.None
-                                && thenByModeSel != GroupingMode.None)
-                            {
-                                GroupingMode mode = thenByModeSel;
-                                bool grouped = GroupingFunctions.GroupClashes(
-                                    clashTest,
-                                    mode,
-                                    GroupingMode.None,
-                                    (bool)keepExistingGroupsCheckBox.IsChecked,
-                                    (bool)skipFixedGroupsCheckBox.IsChecked,
-                                    analyzeNewStatus,
-                                    analyzeActiveStatus,
-                                    analyzeReviewedStatus,
-                                    analyzeApprovedStatus,
-                                    analyzeResolvedStatus,
-                                    customStage1A,
-                                    customStage1B,
-                                    customStage2A,
-                                    customStage2B);
-                                groupingPerformed = groupingPerformed || grouped;
-                            }
-                            else
-                            {
-                                GroupingMode byMode = groupByMode;
-                                GroupingMode thenByMode = thenByModeSel;
-                                bool grouped = GroupingFunctions.GroupClashes(
-                                    clashTest,
-                                    byMode,
-                                    thenByMode,
-                                    (bool)keepExistingGroupsCheckBox.IsChecked,
-                                    (bool)skipFixedGroupsCheckBox.IsChecked,
-                                    analyzeNewStatus,
-                                    analyzeActiveStatus,
-                                    analyzeReviewedStatus,
-                                    analyzeApprovedStatus,
-                                    analyzeResolvedStatus,
-                                    customStage1A,
-                                    customStage1B,
-                                    customStage2A,
-                                    customStage2B);
-                                groupingPerformed = groupingPerformed || grouped;
-                            }
+                            bool grouped = GroupingFunctions.GroupClashes(
+                                clashTest,
+                                groupByMode,
+                                thenByModeSel,
+                                thirdByModeSel,
+                                (bool)keepExistingGroupsCheckBox.IsChecked,
+                                (bool)skipFixedGroupsCheckBox.IsChecked,
+                                analyzeNewStatus,
+                                analyzeActiveStatus,
+                                analyzeReviewedStatus,
+                                analyzeApprovedStatus,
+                                analyzeResolvedStatus,
+                                customStage1A,
+                                customStage1B,
+                                customStage2A,
+                                customStage2B,
+                                customStage3A,
+                                customStage3B);
+                            groupingPerformed = groupingPerformed || grouped;
                         }
-
                     }
                 }
 
@@ -256,7 +233,7 @@ namespace SmartGroupClashes
             AutoSaveSettingsIfMissingForDocument();
         }
 
-        /// <summary>Настраивает видимость панелей параметров пользовательских свойств (этапы 1 и 2).</summary>
+        /// <summary>Настраивает видимость панелей параметров пользовательских свойств (этапы 1–3).</summary>
         private void UpdateCustomPropertyParamsVisibility()
         {
             if (CustomPropertyParamsPanel == null)
@@ -266,7 +243,8 @@ namespace SmartGroupClashes
 
             bool stage1 = GetSelectedGroupingMode(comboBoxGroupBy) == GroupingMode.CustomProperty;
             bool stage2 = GetSelectedGroupingMode(comboBoxThenBy) == GroupingMode.CustomProperty;
-            bool need = stage1 || stage2;
+            bool stage3 = GetSelectedGroupingMode(comboBoxThirdBy) == GroupingMode.CustomProperty;
+            bool need = stage1 || stage2 || stage3;
             CustomPropertyParamsPanel.Visibility = need ? WIN.Visibility.Visible : WIN.Visibility.Collapsed;
             bool enableCustom = need && comboBoxGroupBy.IsEnabled;
 
@@ -278,6 +256,11 @@ namespace SmartGroupClashes
             if (CustomPropertyStage2Panel != null)
             {
                 CustomPropertyStage2Panel.Visibility = stage2 ? WIN.Visibility.Visible : WIN.Visibility.Collapsed;
+            }
+
+            if (CustomPropertyStage3Panel != null)
+            {
+                CustomPropertyStage3Panel.Visibility = stage3 ? WIN.Visibility.Visible : WIN.Visibility.Collapsed;
             }
 
             if (CustomPropertyStage1ComboA != null)
@@ -298,6 +281,16 @@ namespace SmartGroupClashes
             if (CustomPropertyStage2ComboB != null)
             {
                 CustomPropertyStage2ComboB.IsEnabled = enableCustom && stage2;
+            }
+
+            if (CustomPropertyStage3ComboA != null)
+            {
+                CustomPropertyStage3ComboA.IsEnabled = enableCustom && stage3;
+            }
+
+            if (CustomPropertyStage3ComboB != null)
+            {
+                CustomPropertyStage3ComboB.IsEnabled = enableCustom && stage3;
             }
         }
 
@@ -394,7 +387,8 @@ namespace SmartGroupClashes
         {
             bool hasGroupingCondition =
                 GetSelectedGroupingMode(comboBoxGroupBy) != GroupingMode.None
-                || GetSelectedGroupingMode(comboBoxThenBy) != GroupingMode.None;
+                || GetSelectedGroupingMode(comboBoxThenBy) != GroupingMode.None
+                || GetSelectedGroupingMode(comboBoxThirdBy) != GroupingMode.None;
             bool hasStatusSelection =
                 analyzeNewStatusCheckBox.IsChecked == true
                 || analyzeActiveStatusCheckBox.IsChecked == true
@@ -410,6 +404,7 @@ namespace SmartGroupClashes
                 Group_Button.IsEnabled = false;
                 comboBoxGroupBy.IsEnabled = false;
                 comboBoxThenBy.IsEnabled = false;
+                comboBoxThirdBy.IsEnabled = false;
                 Ungroup_Button.IsEnabled = false;
             }
             else
@@ -419,6 +414,7 @@ namespace SmartGroupClashes
                     && hasStatusSelection;
                 comboBoxGroupBy.IsEnabled = true;
                 comboBoxThenBy.IsEnabled = true;
+                comboBoxThirdBy.IsEnabled = true;
                 Ungroup_Button.IsEnabled = ClashTestListBox.SelectedItems.Count > 0;
             }
 
@@ -430,12 +426,14 @@ namespace SmartGroupClashes
         {
             GroupByList.Clear();
             GroupThenList.Clear();
+            GroupThirdList.Clear();
 
             foreach (GroupingMode mode in Enum.GetValues(typeof(GroupingMode)).Cast<GroupingMode>())
             {
                 string label = GroupingModeOption.GetDisplayName(mode);
                 GroupByList.Add(new GroupingModeOption { Mode = mode, DisplayName = label });
                 GroupThenList.Add(new GroupingModeOption { Mode = mode, DisplayName = label });
+                GroupThirdList.Add(new GroupingModeOption { Mode = mode, DisplayName = label });
             }
 
             if (Application.MainDocument.Grids.ActiveSystem == null)
@@ -444,10 +442,13 @@ namespace SmartGroupClashes
                 RemoveModeOption(GroupByList, GroupingMode.Level);
                 RemoveModeOption(GroupThenList, GroupingMode.GridIntersection);
                 RemoveModeOption(GroupThenList, GroupingMode.Level);
+                RemoveModeOption(GroupThirdList, GroupingMode.GridIntersection);
+                RemoveModeOption(GroupThirdList, GroupingMode.Level);
             }
 
             comboBoxGroupBy.SelectedIndex = 0;
             comboBoxThenBy.SelectedIndex = 0;
+            comboBoxThirdBy.SelectedIndex = 0;
             UpdateCustomPropertyParamsVisibility();
         }
 
@@ -712,12 +713,15 @@ namespace SmartGroupClashes
 
                 SetModeSelection(comboBoxGroupBy, ParseText(map, "GroupByMode"));
                 SetModeSelection(comboBoxThenBy, ParseText(map, "ThenByMode"));
+                SetModeSelection(comboBoxThirdBy, ParseText(map, "ThirdByMode"));
                 ApplySelectedTests(ParseText(map, "SelectedTests"));
 
                 CustomPropertyStage1ComboA.Text = ParseText(map, "CustomPropertyStage1A");
                 CustomPropertyStage1ComboB.Text = ParseText(map, "CustomPropertyStage1B");
                 CustomPropertyStage2ComboA.Text = ParseText(map, "CustomPropertyStage2A");
                 CustomPropertyStage2ComboB.Text = ParseText(map, "CustomPropertyStage2B");
+                CustomPropertyStage3ComboA.Text = ParseText(map, "CustomPropertyStage3A");
+                CustomPropertyStage3ComboB.Text = ParseText(map, "CustomPropertyStage3B");
             }
             finally
             {
@@ -779,11 +783,14 @@ namespace SmartGroupClashes
                 "AnalyzeStatusResolved=" + (analyzeResolvedStatusCheckBox.IsChecked == true ? "true" : "false"),
                 "GroupByMode=" + GetSelectedGroupingMode(comboBoxGroupBy),
                 "ThenByMode=" + GetSelectedGroupingMode(comboBoxThenBy),
+                "ThirdByMode=" + GetSelectedGroupingMode(comboBoxThirdBy),
                 "SelectedTests=" + EscapeCfgValue(GetSelectedTestsValue()),
                 "CustomPropertyStage1A=" + EscapeCfgValue(CustomPropertyStage1ComboA.Text),
                 "CustomPropertyStage1B=" + EscapeCfgValue(CustomPropertyStage1ComboB.Text),
                 "CustomPropertyStage2A=" + EscapeCfgValue(CustomPropertyStage2ComboA.Text),
                 "CustomPropertyStage2B=" + EscapeCfgValue(CustomPropertyStage2ComboB.Text),
+                "CustomPropertyStage3A=" + EscapeCfgValue(CustomPropertyStage3ComboA.Text),
+                "CustomPropertyStage3B=" + EscapeCfgValue(CustomPropertyStage3ComboB.Text),
             };
 
             File.WriteAllLines(cfgPath, lines, Encoding.UTF8);

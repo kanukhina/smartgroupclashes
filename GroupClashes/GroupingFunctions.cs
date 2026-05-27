@@ -50,6 +50,7 @@ namespace SmartGroupClashes
         /// <param name="selectedClashTest">Тест коллизий для изменения.</param>
         /// <param name="groupingMode">Первый уровень группировки («Группировать по»).</param>
         /// <param name="subgroupingMode">Второй уровень («Затем по»); <see cref="GroupingMode.None"/>, если не задан.</param>
+        /// <param name="thirdGroupingMode">Третий уровень («И затем по»); <see cref="GroupingMode.None"/>, если не задан.</param>
         /// <param name="keepExistingGroups">Сохранять ли уже существующие группы в тесте.</param>
         /// <param name="skipAllFixedGroups">Не создавать группы, где все пересечения уже в статусе «исправлено»/«утверждено».</param>
         /// <param name="analyzeStatusNew">Включать ли в анализ коллизии со статусом New.</param>
@@ -61,11 +62,14 @@ namespace SmartGroupClashes
         /// <param name="customPropertyStage1SelectionB">Отображаемое имя свойства для стороны B на первом уровне.</param>
         /// <param name="customPropertyStage2SelectionA">Отображаемое имя свойства для стороны A на втором уровне.</param>
         /// <param name="customPropertyStage2SelectionB">Отображаемое имя свойства для стороны B на втором уровне.</param>
+        /// <param name="customPropertyStage3SelectionA">Отображаемое имя свойства для стороны A на третьем уровне.</param>
+        /// <param name="customPropertyStage3SelectionB">Отображаемое имя свойства для стороны B на третьем уровне.</param>
         /// <returns><c>true</c>, если в тест были записаны новые группы или пересечения; <c>false</c>, если нечего обрабатывать.</returns>
         public static bool GroupClashes(
             ClashTest selectedClashTest,
             GroupingMode groupingMode,
             GroupingMode subgroupingMode,
+            GroupingMode thirdGroupingMode,
             bool keepExistingGroups,
             bool skipAllFixedGroups,
             bool analyzeStatusNew,
@@ -76,7 +80,9 @@ namespace SmartGroupClashes
             string customPropertyStage1SelectionA = null,
             string customPropertyStage1SelectionB = null,
             string customPropertyStage2SelectionA = null,
-            string customPropertyStage2SelectionB = null)
+            string customPropertyStage2SelectionB = null,
+            string customPropertyStage3SelectionA = null,
+            string customPropertyStage3SelectionB = null)
         {
             // Собрать отдельные пересечения из дерева теста (с учётом существующих групп).
             List<ClashResult> clashResults = GetIndividualClashResults(selectedClashTest,keepExistingGroups).ToList();
@@ -115,43 +121,50 @@ namespace SmartGroupClashes
                 .GroupBy(r => r.DisplayName, StringComparer.CurrentCultureIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.CurrentCultureIgnoreCase);
 
+            List<GroupingLevel> groupingLevels = BuildGroupingLevels(
+                groupingMode,
+                subgroupingMode,
+                thirdGroupingMode,
+                customPropertyStage1SelectionA,
+                customPropertyStage1SelectionB,
+                customPropertyStage2SelectionA,
+                customPropertyStage2SelectionB,
+                customPropertyStage3SelectionA,
+                customPropertyStage3SelectionB);
+            if (groupingLevels.Count == 0)
+            {
+                return false;
+            }
+
             List<ClashResultGroup> clashResultGroups = new List<ClashResultGroup>();
-            bool needSourceMapForSubgroup = subgroupingMode == GroupingMode.ElementName
-                || subgroupingMode == GroupingMode.FamilyName
-                || subgroupingMode == GroupingMode.TypeName
-                || subgroupingMode == GroupingMode.CustomProperty;
-            Dictionary<ClashResult, ClashResult> sourceByCopy = needSourceMapForSubgroup
+            bool needSourceMap = groupingLevels.Any(level => ModeNeedsSourceMap(level.Mode));
+            Dictionary<ClashResult, ClashResult> sourceByCopy = needSourceMap
                 ? new Dictionary<ClashResult, ClashResult>(new ReferenceEqualityComparer<ClashResult>())
                 : null;
 
-            string stage1A = groupingMode == GroupingMode.CustomProperty ? customPropertyStage1SelectionA : null;
-            string stage1B = groupingMode == GroupingMode.CustomProperty ? customPropertyStage1SelectionB : null;
-            Dictionary<ClashResult, string> cachedSubgroupNameBySource = BuildSubgroupNameCache(
-                clashResults,
-                subgroupingMode,
-                customPropertyStage2SelectionA,
-                customPropertyStage2SelectionB);
-
-            // Первый уровень: сформировать группы по выбранному режиму.
+            GroupingLevel firstLevel = groupingLevels[0];
             CreateGroup(
                 ref clashResultGroups,
-                groupingMode,
+                firstLevel.Mode,
                 clashResults,
                 "",
-                stage1A,
-                stage1B,
+                firstLevel.CustomPropertyA,
+                firstLevel.CustomPropertyB,
                 sourceByCopy);
 
-            // Второй уровень: при необходимости разбить группы на подгруппы.
-            if (subgroupingMode != GroupingMode.None)
+            for (int levelIndex = 1; levelIndex < groupingLevels.Count; levelIndex++)
             {
-                string stage2A = subgroupingMode == GroupingMode.CustomProperty ? customPropertyStage2SelectionA : null;
-                string stage2B = subgroupingMode == GroupingMode.CustomProperty ? customPropertyStage2SelectionB : null;
+                GroupingLevel level = groupingLevels[levelIndex];
+                Dictionary<ClashResult, string> cachedSubgroupNameBySource = BuildSubgroupNameCache(
+                    clashResults,
+                    level.Mode,
+                    level.CustomPropertyA,
+                    level.CustomPropertyB);
                 CreateSubGroups(
                     ref clashResultGroups,
-                    subgroupingMode,
-                    stage2A,
-                    stage2B,
+                    level.Mode,
+                    level.CustomPropertyA,
+                    level.CustomPropertyB,
                     sourceByCopy,
                     sourceByDisplayName,
                     cachedSubgroupNameBySource);
@@ -183,6 +196,66 @@ namespace SmartGroupClashes
                 totalBeforeStatusFilter,
                 totalAfterStatusFilter);
             return true;
+        }
+
+        private sealed class GroupingLevel
+        {
+            public GroupingMode Mode { get; set; }
+            public string CustomPropertyA { get; set; }
+            public string CustomPropertyB { get; set; }
+        }
+
+        private static List<GroupingLevel> BuildGroupingLevels(
+            GroupingMode groupingMode,
+            GroupingMode subgroupingMode,
+            GroupingMode thirdGroupingMode,
+            string customPropertyStage1SelectionA,
+            string customPropertyStage1SelectionB,
+            string customPropertyStage2SelectionA,
+            string customPropertyStage2SelectionB,
+            string customPropertyStage3SelectionA,
+            string customPropertyStage3SelectionB)
+        {
+            List<GroupingLevel> levels = new List<GroupingLevel>();
+            if (groupingMode != GroupingMode.None)
+            {
+                levels.Add(new GroupingLevel
+                {
+                    Mode = groupingMode,
+                    CustomPropertyA = groupingMode == GroupingMode.CustomProperty ? customPropertyStage1SelectionA : null,
+                    CustomPropertyB = groupingMode == GroupingMode.CustomProperty ? customPropertyStage1SelectionB : null,
+                });
+            }
+
+            if (subgroupingMode != GroupingMode.None)
+            {
+                levels.Add(new GroupingLevel
+                {
+                    Mode = subgroupingMode,
+                    CustomPropertyA = subgroupingMode == GroupingMode.CustomProperty ? customPropertyStage2SelectionA : null,
+                    CustomPropertyB = subgroupingMode == GroupingMode.CustomProperty ? customPropertyStage2SelectionB : null,
+                });
+            }
+
+            if (thirdGroupingMode != GroupingMode.None)
+            {
+                levels.Add(new GroupingLevel
+                {
+                    Mode = thirdGroupingMode,
+                    CustomPropertyA = thirdGroupingMode == GroupingMode.CustomProperty ? customPropertyStage3SelectionA : null,
+                    CustomPropertyB = thirdGroupingMode == GroupingMode.CustomProperty ? customPropertyStage3SelectionB : null,
+                });
+            }
+
+            return levels;
+        }
+
+        private static bool ModeNeedsSourceMap(GroupingMode mode)
+        {
+            return mode == GroupingMode.ElementName
+                || mode == GroupingMode.FamilyName
+                || mode == GroupingMode.TypeName
+                || mode == GroupingMode.CustomProperty;
         }
 
         private static void CreateGroup(
